@@ -1,0 +1,4 @@
+#poner las rutas de los .env
+bybit_connector/.env
+telegram_signal_extractor/.env
+.ipynb_checkpoints/
