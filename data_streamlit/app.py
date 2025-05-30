@@ -14,145 +14,205 @@ try:
     df = pd.read_csv(data_path)
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
 except FileNotFoundError:
-    st.error(f"signals_all_tp_results.csv not found.")
+    st.error("signals_all_tp_results.csv not found.")
     df = pd.DataFrame()
 
 # === Overview Section ===
 def show_overview():
-    st.markdown("""
-    ## Project Overview
-    This app analyzes the effectiveness of Telegram crypto trading signals.
+    st.markdown("## Overview")
+    st.markdown("This dashboard analyzes crypto trading signals from a Telegram group to evaluate whether they can be used to build a profitable strategy.")
+    
+    st.markdown("### Warning")
+    st.warning("This analysis does not include Stop Loss (SL). The risk of loss is significantly higher without SL protection.")
 
-    **Goals:**
-    - Measure hit rates per TP level
-    - Compare symbols, directions, and trends
-    - Simulate monthly returns based on signals
-    """)
-    if not df.empty:
-        st.markdown("### Dataset Summary")
-        st.markdown(f"**Date range:** {df['timestamp'].min().date()} to {df['timestamp'].max().date()}")
-        st.markdown(f"**Total signals:** {len(df)}")
+    if st.button("Start the Analysis"):
+        st.markdown("### Project Summary")
+        st.markdown("""
+        - Goal: Evaluate the effectiveness of trading signals.
+        - Scope: Analyze target hit rates, simulate trading returns, and perform statistical analysis.
+        - Method: Simulate $100 per signal, measure returns, volatility, and hit success.
+        """)
+
+        if not df.empty:
+            st.markdown("### Dataset Summary")
+            st.markdown(f"- Date range: {df['timestamp'].min().date()} to {df['timestamp'].max().date()}")
+            st.markdown(f"- Total signals: {len(df)}")
+            st.markdown(f"- Columns: {', '.join(df.columns)}")
 
 # === Charts Section ===
 def show_charts():
-    st.markdown("## Interactive Charts")
+    st.markdown("## Charts")
     plot_dir = Path(__file__).parent / ".." / "telegram_signal_extractor" / "outputs" / "plots"
     chart_files = [
-        ("tp_hits_raw_count.html", "Raw count of TP hits by level and direction."),
-        ("tp_hits_by_direction.html", "Comparison of TP hits between Long and Short signals."),
-        ("tp_hit_rate_global.html", "Overall TP hit percentage across all signals."),
-        ("tp_hierarchical_hit_rate.html", "Hierarchical success of hitting TP levels sequentially."),
-        ("signal_distribution_by_hour.html", "Hourly distribution of signal timestamps (UTC)."),
-        ("top10_errors_barchart.html", "Symbols with the highest percentage of signals with no TP reached."),
-        ("top10_symbol_errors_table.html", "Table of error stats for top 10 symbols (check file name if broken)."),
-        ("tp_signal_count_by_symbol.html", "Number of signals per symbol."),
-        ("hierarchical_tp_hit_rate_top10_heatmap.html", "Sequential TP hit rates by top 10 most frequent symbols."),
-        ("best_symbols_per_tp.html", "Best performing symbol by each TP level."),
+        ("tp_hits_raw_count.html", "TP Hit Count: Raw count of hits by level and direction."),
+        ("tp_hits_by_direction.html", "TP Hit Count by Signal Direction (Long vs Short)."),
+        ("tp_hit_rate_global.html", "Overall TP Hit Rate."),
+        ("tp_hierarchical_hit_rate.html", "Hierarchical TP Hit Rate (Sequential Success)."),
+        ("signal_distribution_by_hour.html", "Hourly Distribution of Signals (UTC)."),
+        ("top10_errors_barchart.html", "Top 10 Symbols with Highest Error Rate."),
+        ("top10_symbol_errors_table.html", "Table: Error Statistics by Symbol."),
+        ("tp_signal_count_by_symbol.html", "Signal Count per Symbol."),
+        ("hierarchical_tp_hit_rate_top10_heatmap.html", "Heatmap: Sequential TP Hit Rates for Top 10 Symbols."),
+        ("best_symbols_per_tp.html", "Best Performing Symbol for Each TP Level.")
     ]
     for file_name, description in chart_files:
         file_path = plot_dir / file_name
         if file_path.exists():
+            st.subheader(description)
             st.components.v1.html(file_path.read_text(encoding="utf-8"), height=600)
-            st.caption(description)
+            # Optional conclusions per chart
+            if "tp_hit_rate_global" in file_name:
+                st.markdown("**Conclusion:** TP40 is the most consistent level hit across all signals.")
+            elif "signal_distribution_by_hour" in file_name:
+                st.markdown("**Conclusion:** Most signals are sent during morning UTC hours, possibly due to market activity.")
+            elif "top10_errors_barchart" in file_name:
+                st.markdown("**Conclusion:** Some symbols have consistently high error rates, indicating unreliable performance.")
+            elif "best_symbols_per_tp" in file_name:
+                st.markdown("**Conclusion:** Certain assets repeatedly achieve top performance at specific TP levels.")
         else:
             st.warning(f"Chart file not found: {file_name}")
 
 # === KPIs Section ===
 def show_kpis():
     st.markdown("## KPIs")
-    st.write("Coming soon: Key metrics on signal accuracy, symbol performance and more.")
-
-# === Simulation Section ===
-def show_simulation():
-    st.markdown("## Monthly Simulation")
-    
     st.markdown("""
-    This section simulates a trading strategy where **$100 is invested in every trading signal**.
-
-    The returns are estimated based on which TP (Take Profit) level was reached. This analysis provides insights into:
-    - The volume and success rate of signals over time
-    - Monthly return trends and cumulative growth
-    - Return variability and comparison between Long and Short directions
-
-     **Warning**: This simulation does **not account for Stop Loss (SL)**. Therefore, it assumes that unprofitable trades result in a 40% loss. This makes the strategy highly risky in practice.
+    - TP Hit Rate by Level (TP40, TP60, TP80, TP100)
+    - Hierarchical TP Hit Rate (sequential)
+    - Top Performing Symbols
+    - Monthly Sharpe Ratio and Volatility
+    - Monthly Average and Cumulative Return
     """)
-
-    df_path = Path(__file__).parent / ".." / "telegram_signal_extractor" / "data" / "clean" / "signals_tp_clean_with_returns.csv"
-    try:
-        df = pd.read_csv(df_path, parse_dates=["timestamp"])
-        df["month"] = df["timestamp"].dt.to_period("M").astype(str)
-    except FileNotFoundError:
-        st.error("signals_tp_clean_with_returns.csv not found.")
-        return
 
     plot_dir = Path(__file__).parent / ".." / "telegram_signal_extractor" / "outputs" / "plots"
 
-    # Chart 1: Volume and success rate
-    chart1 = plot_dir / "monthly_signal_volume_success_rate.html"
-    if chart1.exists():
-        st.subheader("Monthly Signal Volume and Success Rate")
-        st.components.v1.html(chart1.read_text(encoding="utf-8"), height=600)
-        st.markdown("This chart shows the number of signals sent per month (bars) and their corresponding success rate (line). Despite fluctuations in signal volume, the success rate remains relatively stable with a few noticeable drops in early 2025.")
+    # 1. Heatmap
+    file_path = plot_dir / "hierarchical_tp_hit_rate_top10_heatmap.html"
+    if file_path.exists():
+        st.subheader("Heatmap: Sequential TP Hit Rates (Top 10 Symbols)")
+        st.components.v1.html(file_path.read_text(encoding="utf-8"), height=600)
+        st.markdown("**Conclusion:** Some symbols reach multiple TP levels consistently, showing stronger signal quality.")
     else:
-        st.warning("Chart not found: monthly_signal_volume_success_rate.html")
+        st.warning("Chart not found: hierarchical_tp_hit_rate_top10_heatmap.html")
 
-    # Chart 2: Cumulative return over time
-    chart2 = plot_dir / "monthly_return_line_chart.html"
-    if chart2.exists():
-        st.subheader("Simulated Cumulative Return Over Time")
-        st.components.v1.html(chart2.read_text(encoding="utf-8"), height=600)
-        st.markdown("This area chart displays the cumulative return assuming $100 per signal. The consistent upward trend indicates that the strategy is generating compounded returns over time.")
+    # 2. Sharpe vs Volatility
+    file_path = plot_dir / "sharpe_vs_volatility.html"
+    if file_path.exists():
+        st.subheader("Sharpe Ratio vs Volatility")
+        st.components.v1.html(file_path.read_text(encoding="utf-8"), height=600)
+        st.markdown("**Conclusion:** More stable months (low volatility) tend to have higher Sharpe Ratios.")
     else:
-        st.warning("Chart not found: monthly_return_line_chart.html")
+        st.warning("Chart not found: sharpe_vs_volatility.html")
 
-    # Chart 3: Boxplot of returns
-    chart3 = plot_dir / "returns_histogram_by_month.html"
-    if chart3.exists():
-        st.subheader("Distribution of Returns per Month (Boxplot)")
-        st.components.v1.html(chart3.read_text(encoding="utf-8"), height=600)
-        st.markdown("This boxplot shows the spread and median of estimated returns by month. It helps visualize volatility and detect outliers, offering insights into the consistency of the strategy.")
+    # 3. Monthly summary
+    file_path = plot_dir / "monthly_summary_volume_success.html"
+    if file_path.exists():
+        st.subheader("Monthly Summary Table (Returns, Std Dev, Success Rate)")
+        st.components.v1.html(file_path.read_text(encoding="utf-8"), height=600)
+        st.markdown("**Conclusion:** Performance varies widely across months, with some offering higher average returns and others higher risk.")
     else:
-        st.warning("Chart not found: returns_histogram_by_month.html")
+        st.warning("Chart not found: monthly_summary_volume_success.html")
 
-    # Chart 4: Long vs Short comparison
-    chart4 = plot_dir / "monthly_total_return_long_short.html"
-    if chart4.exists():
-        st.subheader("Monthly Total Return: Long vs Short")
-        st.components.v1.html(chart4.read_text(encoding="utf-8"), height=600)
-        st.markdown("This bar chart compares total returns for Long vs Short signals month by month. Long signals usually perform better, but in some months, Short signals provide higher returns.")
-    else:
-        st.warning("Chart not found: monthly_total_return_long_short.html")
-
-    # Final Conclusion
+# === Simulation Section ===
+def show_simulation():
+    st.markdown("## Simulation")
     st.markdown("""
-    ---
-    ### Final Notes
-
-    This simulation suggests that, **without SL**, the trading signals can yield positive cumulative returns if managed consistently over time. However:
-
-    - Return variability is high in some months.
-    - Performance between Long and Short signals fluctuates.
-    - Using this strategy without SL can lead to **significant drawdowns** in bad periods.
-
-    More robust evaluation would require incorporating **market prices**, **real SL triggers**, and possibly **position sizing or filtering mechanisms**.
+    Simulation Logic:
+    - $100 per signal
+    - No Stop Loss applied
+    - TP reached determines return
     """)
 
+    plot_dir = Path(__file__).parent / ".." / "telegram_signal_extractor" / "outputs" / "plots"
+
+    chart_files = [
+        ("returns_histogram_by_month.html", "Monthly Return Distribution"),
+        ("monthly_total_return_long_short.html", "Long vs Short Return Comparison"),
+        ("cumulative_monthly_return.html", "Cumulative Return Over Time"),
+    ]
+    for file_name, description in chart_files:
+        file_path = plot_dir / file_name
+        if file_path.exists():
+            st.subheader(description)
+            st.components.v1.html(file_path.read_text(encoding="utf-8"), height=600)
+            if "returns_histogram_by_month" in file_name:
+                st.markdown("**Conclusion:** Monthly return distributions show high variability, indicating inconsistent performance.")
+            elif "monthly_total_return_long_short" in file_name:
+                st.markdown("**Conclusion:** On average, Long and Short signals perform similarly.")
+            elif "cumulative_monthly_return" in file_name:
+                st.markdown("**Conclusion:** The strategy accumulates gains over time but experiences significant drawdowns.")
+        else:
+            st.warning(f"Chart not found: {file_name}")
+
+    st.markdown("### Conclusions from Simulation")
+    st.markdown("""
+    - High-performing months often correlate with lower volatility.
+    - Long and Short signals yield similar results on average.
+    - No clear correlation between signal volume and success rate.
+    """)
 
 # === Hypothesis Testing Section ===
 def show_hypothesis():
     st.markdown("## Hypothesis Testing")
     st.markdown("""
-    Results of statistical tests on signal performance:
-    - Direction effectiveness (Long vs Short)
-    - Entry price correlation
-    - Time slot performance
-    - Year-over-year trends
+    Statistical Tests Conducted:
+
+    | Hypothesis | Test | Conclusion |
+    |------------|------|------------|
+    | Long vs Short returns differ? | t-test | No significant difference |
+    | Are 2024 signals better than 2023? | t-test | Yes, 2024 performs better |
+    | Do morning signals perform better? | t-test | Yes, statistically higher returns |
+    | Do recent signals outperform older ones? | t-test | Yes, recent signals perform better |
+
+    These results are based on return distributions and statistical confidence levels.
     """)
+
+    plot_dir = Path(__file__).parent / ".." / "telegram_signal_extractor" / "outputs" / "plots"
+
+    # 1. Long vs Short
+    file_path = plot_dir / "monthly_total_return_long_short.html"
+    if file_path.exists():
+        st.subheader("Long vs Short Return Comparison")
+        st.components.v1.html(file_path.read_text(encoding="utf-8"), height=600)
+        st.markdown("**Conclusion:** Returns are statistically similar for Long and Short signals, despite perceived directional bias.")
+    else:
+        st.warning("Chart not found: monthly_total_return_long_short.html")
+
+
+    # 3. Morning vs other hours
+    file_path = plot_dir / "avg_return_by_hour.html"
+    if file_path.exists():
+        st.subheader("Average Return by Hour (UTC)")
+        st.components.v1.html(file_path.read_text(encoding="utf-8"), height=600)
+        st.markdown("**Conclusion:** Signals sent early in the UTC day have higher average returns, supporting the time-of-day hypothesis.")
+    else:
+        st.warning("Chart not found: avg_return_by_hour.html")
+
 
 # === Insights Section ===
 def show_insights():
-    st.markdown("## Key Insights")
-    st.write("Final conclusions, takeaways, and potential applications.")
+    st.markdown("## Insights")
+
+    st.markdown("### Key Insights")
+    st.markdown("""
+    - TP40 is the most consistently reached level.
+    - Signals sent during morning UTC hours show higher returns.
+    - No significant difference between Long and Short signals.
+    - Symbols such as PYTH, TIA, and MYRO perform best.
+    - Sharpe Ratio varies month to month.
+    """)
+
+    st.markdown("### Limitations")
+    st.markdown("""
+    - No Stop Loss used, leading to potential high drawdowns.
+    - Daily high/low used for validation, not real-time execution.
+    - Assumes $100 fixed investment per signal.
+    - Market prices are not confirmed through exchange APIs.
+    """)
+
+    st.markdown("### Final Conclusions")
+    st.markdown("""
+    Telegram signals show potential for profitability, especially at conservative targets. However, due to volatility and risk, they should not be used without proper risk management and further real-time testing.
+    """)
 
 # === Section router ===
 if section == "Overview":
@@ -167,3 +227,4 @@ elif section == "Hypothesis Testing":
     show_hypothesis()
 elif section == "Insights":
     show_insights()
+
